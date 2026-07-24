@@ -136,10 +136,12 @@ pub(crate) fn process_image_common(input_bytes: &[u8], config: Option<Config>) -
     };
 
     let snapped_img = resample::resample(&analysis_img, &col_cuts, &row_cuts, &config)?;
-    let output_img = match config.palette.as_deref() {
+    let palette_img = match config.palette.as_deref() {
         Some(palette) => apply_palette(&snapped_img, palette)?,
         None => snapped_img,
     };
+    let output_img = postprocess::postprocess(palette_img, &config);
+    let (out_w, out_h) = output_img.dimensions();
 
     // Returns bytes for both implementations
     let mut output_bytes = Vec::new();
@@ -152,8 +154,8 @@ pub(crate) fn process_image_common(input_bytes: &[u8], config: Option<Config>) -
         output_bytes,
         pixel_size: chosen.step,
         pixel_size_override: config.pixel_size_override.is_some(),
-        output_width: (col_cuts.len() - 1) as u32,
-        output_height: (row_cuts.len() - 1) as u32,
+        output_width: out_w,
+        output_height: out_h,
         selected_detector,
         candidates,
     })
