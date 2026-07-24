@@ -8,6 +8,7 @@ mod config;
 pub mod detect;
 mod error;
 mod palette;
+mod postprocess;
 mod profile;
 mod quantize;
 pub mod resample;

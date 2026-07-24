@@ -6,6 +6,7 @@
 //! the wasm_bindgen export consumed by JS.
 
 use crate::detect::DetectStrategy;
+use crate::postprocess::{AlphaThreshold, BgConnectivity, BgScope, OutlineStyle};
 use crate::quantize::{Colorspace, DitherMethod, PresetPalette};
 use crate::resample::ResampleMethod;
 
@@ -46,6 +47,15 @@ pub struct Config {
     pub(crate) quantize_dither: DitherMethod,
     pub(crate) quantize_dither_strength: f64,
     pub(crate) quantize_preset_palette: PresetPalette,
+    pub(crate) post_bg_remove: bool,
+    pub(crate) post_bg_tolerance: u8,
+    pub(crate) post_bg_connectivity: BgConnectivity,
+    pub(crate) post_bg_scope: BgScope,
+    pub(crate) post_bg_floating_max_pixels: usize,
+    pub(crate) post_outline: OutlineStyle,
+    pub(crate) post_outline_color: [u8; 3],
+    pub(crate) post_morph: bool,
+    pub(crate) post_alpha_threshold: AlphaThreshold,
 }
 
 impl Default for Config {
@@ -79,6 +89,15 @@ impl Default for Config {
             quantize_dither: DitherMethod::None,
             quantize_dither_strength: 1.0,
             quantize_preset_palette: PresetPalette::None,
+            post_bg_remove: false,
+            post_bg_tolerance: 64,
+            post_bg_connectivity: BgConnectivity::Conn4,
+            post_bg_scope: BgScope::Outer,
+            post_bg_floating_max_pixels: 0,
+            post_outline: OutlineStyle::None,
+            post_outline_color: [0, 0, 0],
+            post_morph: false,
+            post_alpha_threshold: AlphaThreshold::None,
         }
     }
 }
