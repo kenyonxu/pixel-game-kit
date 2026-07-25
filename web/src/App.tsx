@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { useStore } from "@/store";
-import type { InputMeta } from "@/store";
 import Header from "@/components/Header";
 import UploadZone from "@/components/UploadZone";
+import { loadImageFile } from "@/components/UploadZone";
 import ConfigForm from "@/components/ConfigForm";
 import CandidateGrid from "@/components/CandidateGrid";
 import CompareView from "@/components/CompareView";
@@ -10,144 +10,50 @@ import Summary from "@/components/Summary";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-declare module "@pkg/pixel_game_kit.js" {
-  export default function init(): Promise<void>;
-  export function process_image(
-    bytes: Uint8Array,
-    ...args: unknown[]
-  ): Uint8Array;
-  export function detect_candidates(
-    bytes: Uint8Array,
-    kColors: number,
-    strategy: string | null
-  ): string;
-}
+import { RotateCcw, X } from "lucide-react";
+import { configToWasm } from "@/wasm/adapter";
+import { processInWorker } from "@/wasm/wasm-loader";
+import { bytesToObjectUrl } from "@/lib/blob";
 
 export default function App() {
   const status = useStore((s) => s.status);
   const error = useStore((s) => s.error);
   const inputBytes = useStore((s) => s.inputBytes);
   const inputMeta = useStore((s) => s.inputMeta);
-  const config = useStore((s) => s.config);
   const setStatus = useStore((s) => s.setStatus);
   const setError = useStore((s) => s.setError);
   const setResult = useStore((s) => s.setResult);
-  const setCandidates = useStore((s) => s.setCandidates);
-  const setImage = useStore((s) => s.setImage);
-  const result = useStore((s) => s.result);
   const reset = useStore((s) => s.reset);
 
-  // Initialize WASM
+  // Global paste (works anywhere, not just when UploadZone is focused).
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const init = (await import("@pkg/pixel_game_kit.js")).default;
-        await init();
-        if (!cancelled) setStatus("ready");
-      } catch (e) {
-        if (!cancelled)
-          setError(
-            "WASM load failed: " + String((e as Error)?.message ?? e)
-          );
-      }
-    })();
-    return () => {
-      cancelled = true;
+    const onPaste = (e: ClipboardEvent) => {
+      const item = [...(e.clipboardData?.items ?? [])].find((i) => i.type.startsWith("image/"));
+      const file = item?.getAsFile();
+      if (file) loadImageFile(file);
     };
-  }, [setStatus, setError]);
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
 
   const handleProcess = async () => {
-    if (!inputBytes || !inputMeta) return;
-
+    // Read fresh state at call time (no stale closure).
+    const { inputBytes, config } = useStore.getState();
+    if (!inputBytes) return;
     setStatus("processing");
     try {
-      const adapter = await import("@/wasm/adapter");
-      const { configToWasm } = adapter;
       const { positional, post_config } = configToWasm(config);
-
-      const Worker = (
-        await import("@/wasm/worker?worker")
-      ).default as unknown as new () => Worker;
-      const worker = new Worker();
-
-      const resultPromise = new Promise<{
-        resultBytes: Uint8Array;
-        elapsedMs: number;
-      }>((resolve, reject) => {
-        worker.onmessage = (e) => {
-          const data = e.data;
-          if (data.type === "error") reject(new Error(data.error));
-          else resolve(data);
-        };
-      });
-
-      worker.postMessage({
-        type: "process",
-        bytes: inputBytes,
-        positional,
-        post_config,
-      });
-
-      const { resultBytes, elapsedMs } = await resultPromise;
-      worker.terminate();
-
-      const url = URL.createObjectURL(
-        new Blob([resultBytes], { type: "image/png" })
-      );
-
-      // Decode output dimensions
+      const bytes = inputBytes.slice(); // copy — transfer detaches the original
+      const { resultBytes, elapsedMs } = await processInWorker(bytes, positional, post_config);
+      const url = bytesToObjectUrl(resultBytes, "image/png");
       const outMeta = await decodeImageMeta(resultBytes);
-      setResult({
-        bytes: resultBytes,
-        url,
-        elapsedMs,
-        outW: outMeta.w,
-        outH: outMeta.h,
-      });
-
-      // Also run detection
-      handleDetect(inputBytes, config.k_colors, config.detect_strategy);
+      setResult({ bytes: resultBytes, url, elapsedMs, outW: outMeta.w, outH: outMeta.h });
     } catch (e) {
       setError(String((e as Error)?.message ?? e));
     }
   };
 
-  const handleDetect = async (
-    bytes: Uint8Array,
-    kColors: number,
-    strategy: string
-  ) => {
-    try {
-      const Worker = (
-        await import("@/wasm/worker?worker")
-      ).default as unknown as new () => Worker;
-      const worker = new Worker();
-
-      const detectPromise = new Promise<any[]>((resolve, reject) => {
-        worker.onmessage = (e) => {
-          if (e.data.type === "error") reject(new Error(e.data.error));
-          else resolve(e.data.candidates ?? []);
-        };
-      });
-
-      worker.postMessage({
-        type: "detect",
-        bytes,
-        k_colors: kColors,
-        detect_strategy: strategy === "auto" ? null : strategy,
-      });
-
-      const candidates = await detectPromise;
-      worker.terminate();
-      setCandidates(candidates);
-    } catch {
-      // Detection is non-critical; silently ignore
-    }
-  };
-
-  const canProcess = status === "ready" && inputBytes && inputMeta && !result;
+  const canProcess = !!inputBytes && !!inputMeta && status !== "processing";
 
   return (
     <div className="h-full flex flex-col">
@@ -164,26 +70,23 @@ export default function App() {
           </ScrollArea>
           <div className="p-4 border-t border-border space-y-2">
             {error && (
-              <p className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1">
-                {error}
-              </p>
+              <div className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1 flex items-center justify-between gap-2">
+                <span className="truncate">{error}</span>
+                <button
+                  onClick={() => setError(null)}
+                  className="shrink-0 hover:text-destructive cursor-pointer"
+                  title="Dismiss"
+                >
+                  <X size={14} />
+                </button>
+              </div>
             )}
             <div className="flex gap-2">
-              <Button
-                className="flex-1"
-                disabled={!canProcess}
-                onClick={handleProcess}
-              >
+              <Button className="flex-1" disabled={!canProcess} onClick={handleProcess}>
                 {status === "processing" ? "Processing…" : "Run Pipeline"}
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                disabled={!inputBytes}
-                onClick={reset}
-                title="Reset"
-              >
-                &#x21bb;
+              <Button variant="outline" size="icon" disabled={!inputBytes} onClick={reset} title="Reset">
+                <RotateCcw size={16} />
               </Button>
             </div>
           </div>
@@ -194,9 +97,7 @@ export default function App() {
           <ScrollArea className="flex-1 p-6">
             {!inputBytes ? (
               <div className="h-full flex items-center justify-center">
-                <p className="text-sm text-muted-foreground">
-                  Drop an image or paste one to get started
-                </p>
+                <p className="text-sm text-muted-foreground">Drop an image or paste one to get started</p>
               </div>
             ) : (
               <div className="max-w-2xl mx-auto space-y-5">
@@ -212,9 +113,7 @@ export default function App() {
   );
 }
 
-async function decodeImageMeta(
-  bytes: Uint8Array
-): Promise<{ w: number; h: number }> {
+async function decodeImageMeta(bytes: Uint8Array): Promise<{ w: number; h: number }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -222,6 +121,6 @@ async function decodeImageMeta(
       resolve({ w: img.width, h: img.height });
     };
     img.onerror = () => reject(new Error("Failed to decode result image"));
-    img.src = URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
+    img.src = bytesToObjectUrl(bytes, "image/png");
   });
 }
