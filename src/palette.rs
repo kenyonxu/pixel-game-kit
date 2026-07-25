@@ -129,6 +129,16 @@ pub(crate) fn extract_palette_from_image_via_bytes(
     extract_palette_from_image(&img, k_colors, colorspace)
 }
 
+/// Format a palette as comma-separated 6-digit hex (the `palette_hex` shape
+/// consumed by `parse_palette_hex` / the WASM `palette_hex` param).
+pub(crate) fn palette_to_hex(palette: &[[u8; 3]]) -> String {
+    palette
+        .iter()
+        .map(|c| format!("{:02x}{:02x}{:02x}", c[0], c[1], c[2]))
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod palette_tests {
     use super::*;
@@ -205,5 +215,10 @@ mod palette_tests {
             }
         }
         assert_eq!(got, expected);
+    }
+
+    #[test]
+    fn palette_to_hex_format() {
+        assert_eq!(palette_to_hex(&[[0, 0, 0], [255, 128, 64]]), "000000,ff8040");
     }
 }
