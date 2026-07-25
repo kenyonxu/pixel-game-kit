@@ -2,7 +2,7 @@
 
 use crate::postprocess::AlphaThreshold;
 use crate::Config;
-use image::{ImageBuffer, Rgba, RgbaImage};
+use image::RgbaImage;
 
 pub fn binarize_alpha(img: RgbaImage, config: &Config) -> RgbaImage {
     let threshold: u8 = match config.post_alpha_threshold {
@@ -64,6 +64,7 @@ fn otsu_threshold(img: &RgbaImage) -> Option<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::{ImageBuffer, Rgba};
 
     fn img4(a: [u8; 4]) -> RgbaImage {
         ImageBuffer::from_pixel(2, 2, Rgba(a))

@@ -34,6 +34,87 @@ use validate::validate_image_dimensions;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+#[cfg(target_arch = "wasm32")]
+#[derive(serde::Deserialize, Default)]
+#[serde(default)]
+struct PostConfig {
+    bg_remove: Option<bool>,
+    bg_tolerance: Option<u8>,
+    bg_connectivity: Option<String>,
+    bg_scope: Option<String>,
+    bg_floating_threshold: Option<usize>,
+    outline: Option<String>,
+    outline_color: Option<String>,
+    morph: Option<bool>,
+    alpha_threshold: Option<String>,
+}
+
+#[cfg(target_arch = "wasm32")]
+fn apply_post_config(
+    config: &mut Config,
+    json: &str,
+) -> std::result::Result<(), wasm_bindgen::JsValue> {
+    let pc: PostConfig = serde_json::from_str(json)
+        .map_err(|e| wasm_bindgen::JsValue::from_str(&format!("invalid post_config JSON: {}", e)))?;
+    if let Some(v) = pc.bg_remove {
+        config.post_bg_remove = v;
+    }
+    if let Some(v) = pc.bg_tolerance {
+        config.post_bg_tolerance = v;
+    }
+    if let Some(v) = pc.bg_connectivity {
+        config.post_bg_connectivity = match v.as_str() {
+            "4" => postprocess::BgConnectivity::Conn4,
+            "8" => postprocess::BgConnectivity::Conn8,
+            _ => return Err(wasm_bindgen::JsValue::from_str("bg_connectivity must be 4|8")),
+        };
+    }
+    if let Some(v) = pc.bg_scope {
+        config.post_bg_scope = match v.as_str() {
+            "outer" => postprocess::BgScope::Outer,
+            "all" => postprocess::BgScope::All,
+            _ => return Err(wasm_bindgen::JsValue::from_str("bg_scope must be outer|all")),
+        };
+    }
+    if let Some(v) = pc.bg_floating_threshold {
+        config.post_bg_floating_max_pixels = v;
+    }
+    if let Some(v) = pc.outline {
+        config.post_outline = match v.as_str() {
+            "none" => postprocess::OutlineStyle::None,
+            "rounded" => postprocess::OutlineStyle::Rounded,
+            "sharp" => postprocess::OutlineStyle::Sharp,
+            _ => return Err(wasm_bindgen::JsValue::from_str("outline must be none|rounded|sharp")),
+        };
+    }
+    if let Some(v) = pc.outline_color {
+        let cols = parse_palette_hex(&v).map_err(wasm_bindgen::JsValue::from)?;
+        if cols.len() != 1 {
+            return Err(wasm_bindgen::JsValue::from_str(
+                "outline_color must be a single hex color",
+            ));
+        }
+        config.post_outline_color = cols[0];
+    }
+    if let Some(v) = pc.morph {
+        config.post_morph = v;
+    }
+    if let Some(v) = pc.alpha_threshold {
+        config.post_alpha_threshold = match v.as_str() {
+            "auto" => postprocess::AlphaThreshold::Auto,
+            n => match n.parse::<u8>() {
+                Ok(t) => postprocess::AlphaThreshold::Fixed(t),
+                Err(_) => {
+                    return Err(wasm_bindgen::JsValue::from_str(
+                        "alpha_threshold must be 0-255 or auto",
+                    ))
+                }
+            },
+        };
+    }
+    Ok(())
+}
+
 #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub(crate) struct ProcessedImage {
     pub(crate) output_bytes: Vec<u8>,
@@ -140,7 +221,7 @@ pub(crate) fn process_image_common(input_bytes: &[u8], config: Option<Config>) -
         Some(palette) => apply_palette(&snapped_img, palette)?,
         None => snapped_img,
     };
-    let output_img = postprocess::postprocess(palette_img, &config);
+    let output_img = postprocess::run(palette_img, &config);
     let (out_w, out_h) = output_img.dimensions();
 
     // Returns bytes for both implementations
@@ -175,6 +256,7 @@ pub fn process_image(
     colorspace: Option<String>,
     dither: Option<String>,
     preset_palette: Option<String>,
+    post_config: Option<String>,
 ) -> std::result::Result<Vec<u8>, wasm_bindgen::JsValue> {
     let mut config = Config::default();
     if let Some(k) = k_colors {
@@ -256,6 +338,10 @@ pub fn process_image(
                 "preset_palette must be none|nes|gameboy|sgb|snes|pc9801|msx1|pico8|sweetie16|endesga32",
             )),
         };
+    }
+
+    if let Some(json) = post_config {
+        apply_post_config(&mut config, &json)?;
     }
 
     process_image_common(input_bytes, Some(config))
