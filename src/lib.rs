@@ -21,14 +21,14 @@ pub use error::{PixelSnapperError, Result};
 #[cfg(not(target_arch = "wasm32"))]
 pub use cli::run_cli;
 
+use detect::{detect, select_best, CutMethod, DetectStrategy, DetectionCandidate};
 use image::GenericImageView;
-use detect::{detect, select_best, CutMethod, DetectionCandidate, DetectStrategy};
 use palette::apply_palette;
 // Only the wasm32 `process_image` export parses palette hex strings.
 #[cfg(target_arch = "wasm32")]
 use palette::parse_palette_hex;
 use profile::{compute_profiles, estimate_step_size, resolve_step_sizes};
-use stabilize::{snap_uniform_cuts, walk, stabilize_both_axes};
+use stabilize::{snap_uniform_cuts, stabilize_both_axes, walk};
 use validate::validate_image_dimensions;
 
 #[cfg(target_arch = "wasm32")]
@@ -54,8 +54,9 @@ fn apply_post_config(
     config: &mut Config,
     json: &str,
 ) -> std::result::Result<(), wasm_bindgen::JsValue> {
-    let pc: PostConfig = serde_json::from_str(json)
-        .map_err(|e| wasm_bindgen::JsValue::from_str(&format!("invalid post_config JSON: {}", e)))?;
+    let pc: PostConfig = serde_json::from_str(json).map_err(|e| {
+        wasm_bindgen::JsValue::from_str(&format!("invalid post_config JSON: {}", e))
+    })?;
     if let Some(v) = pc.bg_remove {
         config.post_bg_remove = v;
     }
@@ -66,14 +67,22 @@ fn apply_post_config(
         config.post_bg_connectivity = match v.as_str() {
             "4" => postprocess::BgConnectivity::Conn4,
             "8" => postprocess::BgConnectivity::Conn8,
-            _ => return Err(wasm_bindgen::JsValue::from_str("bg_connectivity must be 4|8")),
+            _ => {
+                return Err(wasm_bindgen::JsValue::from_str(
+                    "bg_connectivity must be 4|8",
+                ))
+            }
         };
     }
     if let Some(v) = pc.bg_scope {
         config.post_bg_scope = match v.as_str() {
             "outer" => postprocess::BgScope::Outer,
             "all" => postprocess::BgScope::All,
-            _ => return Err(wasm_bindgen::JsValue::from_str("bg_scope must be outer|all")),
+            _ => {
+                return Err(wasm_bindgen::JsValue::from_str(
+                    "bg_scope must be outer|all",
+                ))
+            }
         };
     }
     if let Some(v) = pc.bg_floating_threshold {
@@ -84,7 +93,11 @@ fn apply_post_config(
             "none" => postprocess::OutlineStyle::None,
             "rounded" => postprocess::OutlineStyle::Rounded,
             "sharp" => postprocess::OutlineStyle::Sharp,
-            _ => return Err(wasm_bindgen::JsValue::from_str("outline must be none|rounded|sharp")),
+            _ => {
+                return Err(wasm_bindgen::JsValue::from_str(
+                    "outline must be none|rounded|sharp",
+                ))
+            }
         };
     }
     if let Some(v) = pc.outline_color {
@@ -127,7 +140,10 @@ pub(crate) struct ProcessedImage {
 }
 
 /// Shared pipeline entry point for both the CLI and WASM targets.
-pub(crate) fn process_image_common(input_bytes: &[u8], config: Option<Config>) -> Result<ProcessedImage> {
+pub(crate) fn process_image_common(
+    input_bytes: &[u8],
+    config: Option<Config>,
+) -> Result<ProcessedImage> {
     let config = config.unwrap_or_default();
 
     let img = image::load_from_memory(input_bytes)?;
@@ -294,9 +310,11 @@ pub fn process_image(
             "median" => resample::ResampleMethod::Median,
             "dominant" => resample::ResampleMethod::Dominant,
             "mode" => resample::ResampleMethod::Mode,
-            _ => return Err(wasm_bindgen::JsValue::from_str(
-                "resample_method must be majority|median|dominant|mode",
-            )),
+            _ => {
+                return Err(wasm_bindgen::JsValue::from_str(
+                    "resample_method must be majority|median|dominant|mode",
+                ))
+            }
         };
     }
 
@@ -304,9 +322,11 @@ pub fn process_image(
         config.quantize_colorspace = match s.as_str() {
             "rgb" => quantize::Colorspace::Rgb,
             "oklab" => quantize::Colorspace::Oklab,
-            _ => return Err(wasm_bindgen::JsValue::from_str(
-                "colorspace must be rgb|oklab",
-            )),
+            _ => {
+                return Err(wasm_bindgen::JsValue::from_str(
+                    "colorspace must be rgb|oklab",
+                ))
+            }
         };
     }
     if let Some(s) = dither {
@@ -317,9 +337,11 @@ pub fn process_image(
             "bayer4" => quantize::DitherMethod::Bayer4,
             "bayer8" => quantize::DitherMethod::Bayer8,
             "ordered" => quantize::DitherMethod::Ordered,
-            _ => return Err(wasm_bindgen::JsValue::from_str(
-                "dither must be none|fs|bayer2|bayer4|bayer8|ordered",
-            )),
+            _ => {
+                return Err(wasm_bindgen::JsValue::from_str(
+                    "dither must be none|fs|bayer2|bayer4|bayer8|ordered",
+                ))
+            }
         };
     }
     if let Some(s) = preset_palette {

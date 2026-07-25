@@ -83,12 +83,7 @@ static SWEETIE16: [[u8; 3]; 16] = [
     [51, 60, 87],
 ];
 
-static GAMEBOY: [[u8; 3]; 4] = [
-    [15, 56, 15],
-    [48, 98, 48],
-    [139, 172, 15],
-    [155, 188, 15],
-];
+static GAMEBOY: [[u8; 3]; 4] = [[15, 56, 15], [48, 98, 48], [139, 172, 15], [155, 188, 15]];
 
 // NES — PixelRefiner `nes`, deduped from 64 entries (10× #000000 → 1) to 55
 // unique colors. Order preserved from source.

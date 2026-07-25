@@ -61,8 +61,7 @@ fn rejects_unknown_options() {
 
 #[test]
 fn parses_detect_strategy_flag() {
-    let command =
-        parse_cli_args(&args(&["input.png", "output.png", "--detect", "tiled"])).unwrap();
+    let command = parse_cli_args(&args(&["input.png", "output.png", "--detect", "tiled"])).unwrap();
     let CliCommand::Run(config) = command else {
         panic!("expected Run");
     };
@@ -71,39 +70,53 @@ fn parses_detect_strategy_flag() {
 
 #[test]
 fn parses_resample_flag() {
-    let command = parse_cli_args(&args(&[
-        "input.png", "output.png", "--resample", "median",
-    ])).unwrap();
-    let CliCommand::Run(config) = command else { panic!("expected Run"); };
-    assert_eq!(config.resample_method, crate::resample::ResampleMethod::Median);
+    let command =
+        parse_cli_args(&args(&["input.png", "output.png", "--resample", "median"])).unwrap();
+    let CliCommand::Run(config) = command else {
+        panic!("expected Run");
+    };
+    assert_eq!(
+        config.resample_method,
+        crate::resample::ResampleMethod::Median
+    );
 }
 
 #[test]
 fn parses_sample_window_flag() {
-    let command = parse_cli_args(&args(&[
-        "input.png", "output.png", "--sample-window", "5",
-    ])).unwrap();
-    let CliCommand::Run(config) = command else { panic!("expected Run"); };
+    let command =
+        parse_cli_args(&args(&["input.png", "output.png", "--sample-window", "5"])).unwrap();
+    let CliCommand::Run(config) = command else {
+        panic!("expected Run");
+    };
     assert_eq!(config.resample_sample_window, 5);
 }
 
 #[test]
 fn parses_colorspace_flag() {
     let cmd = parse_cli_args(&args(&["i.png", "o.png", "--colorspace", "rgb"])).unwrap();
-    let CliCommand::Run(c) = cmd else { panic!("expected Run") };
+    let CliCommand::Run(c) = cmd else {
+        panic!("expected Run")
+    };
     assert_eq!(c.quantize_colorspace, crate::quantize::Colorspace::Rgb);
 }
 
 #[test]
 fn parses_dither_flag() {
     let cmd = parse_cli_args(&args(&["i.png", "o.png", "--dither", "bayer4"])).unwrap();
-    let CliCommand::Run(c) = cmd else { panic!("expected Run") };
+    let CliCommand::Run(c) = cmd else {
+        panic!("expected Run")
+    };
     assert_eq!(c.quantize_dither, crate::quantize::DitherMethod::Bayer4);
 }
 
 #[test]
 fn parses_preset_flag() {
     let cmd = parse_cli_args(&args(&["i.png", "o.png", "--preset", "pico8"])).unwrap();
-    let CliCommand::Run(c) = cmd else { panic!("expected Run") };
-    assert_eq!(c.quantize_preset_palette, crate::quantize::PresetPalette::Pico8);
+    let CliCommand::Run(c) = cmd else {
+        panic!("expected Run")
+    };
+    assert_eq!(
+        c.quantize_preset_palette,
+        crate::quantize::PresetPalette::Pico8
+    );
 }

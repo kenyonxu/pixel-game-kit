@@ -1,8 +1,8 @@
 //! Grid-cell resampling strategies. See `ResampleMethod`.
 
+mod dominant;
 mod majority;
 mod median;
-mod dominant;
 mod mode;
 mod qvote;
 

@@ -368,9 +368,17 @@ mod tests {
         c.post_bg_tolerance = 0;
         c.post_bg_scope = BgScope::All;
         let out = flood_fill_transparent(img, &c);
-        assert_eq!(out.get_pixel(2, 2).0[3], 0, "interior white pocket stripped by All");
+        assert_eq!(
+            out.get_pixel(2, 2).0[3],
+            0,
+            "interior white pocket stripped by All"
+        );
         assert_eq!(out.get_pixel(0, 0).0[3], 0, "border white stripped");
-        assert_eq!(out.get_pixel(1, 1).0[3], 255, "red ring not a border color survives");
+        assert_eq!(
+            out.get_pixel(1, 1).0[3],
+            255,
+            "red ring not a border color survives"
+        );
         assert_eq!(out.get_pixel(2, 1).0[3], 255, "red ring survives");
     }
 
@@ -405,6 +413,10 @@ mod tests {
         let mut img = RgbaImage::new(3, 3);
         img.put_pixel(1, 1, Rgba([99, 99, 99, 255]));
         remove_small_floating_components(&mut img, 5);
-        assert_eq!(img.get_pixel(1, 1).0[3], 255, "largest survives even if small");
+        assert_eq!(
+            img.get_pixel(1, 1).0[3],
+            255,
+            "largest survives even if small"
+        );
     }
 }

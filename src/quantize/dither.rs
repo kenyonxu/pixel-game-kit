@@ -76,7 +76,11 @@ pub fn floyd_steinberg(img: &mut RgbaImage, strength: f64) {
                 old[3],
             ];
             let s = strength as f32;
-            let err = [(old[0] - new[0]) * s, (old[1] - new[1]) * s, (old[2] - new[2]) * s];
+            let err = [
+                (old[0] - new[0]) * s,
+                (old[1] - new[1]) * s,
+                (old[2] - new[2]) * s,
+            ];
             buf[idx(x, y)] = new;
             let diffs: [(isize, isize, f32); 4] = [
                 (1, 0, 7.0 / 16.0),

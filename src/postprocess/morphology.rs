@@ -17,8 +17,7 @@ pub fn morph_open_close(img: RgbaImage, config: &Config) -> RgbaImage {
     }
 
     let opened = apply_morph(&img, w, h, MorphOp::Erode, MorphOp::Dilate);
-    let closed = apply_morph(&opened, w, h, MorphOp::Dilate, MorphOp::Erode);
-    closed
+    apply_morph(&opened, w, h, MorphOp::Dilate, MorphOp::Erode)
 }
 
 #[derive(Clone, Copy)]
@@ -27,13 +26,7 @@ enum MorphOp {
     Dilate,
 }
 
-fn apply_morph(
-    img: &RgbaImage,
-    w: u32,
-    h: u32,
-    first: MorphOp,
-    second: MorphOp,
-) -> RgbaImage {
+fn apply_morph(img: &RgbaImage, w: u32, h: u32, first: MorphOp, second: MorphOp) -> RgbaImage {
     let tmp = morph_pass(img, w, h, first);
     morph_pass(&tmp, w, h, second)
 }

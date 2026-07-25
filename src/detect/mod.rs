@@ -90,7 +90,10 @@ pub fn select_best(
     }
     let filtered: Vec<&DetectionCandidate> = match strategy {
         DetectStrategy::Auto => candidates.iter().collect(),
-        specific => candidates.iter().filter(|c| c.detector == specific).collect(),
+        specific => candidates
+            .iter()
+            .filter(|c| c.detector == specific)
+            .collect(),
     };
     if filtered.is_empty() {
         return None;

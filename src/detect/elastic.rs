@@ -1,6 +1,6 @@
 //! Elastic detector: wraps the existing profile-based step estimation.
 
-use crate::detect::{CutMethod, DetectionCandidate, DetectStrategy};
+use crate::detect::{CutMethod, DetectStrategy, DetectionCandidate};
 use crate::Config;
 use image::RgbaImage;
 

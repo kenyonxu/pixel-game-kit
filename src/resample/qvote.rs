@@ -38,9 +38,8 @@ fn dominant_centroid(points: &[[f32; 3]], cell_index: usize, seed: u64) -> [f32;
 
     // Per-cell deterministic seed: mix the global seed with the cell index so
     // cells don't all share one RNG stream, yet reruns are byte-identical.
-    let mut rng = ChaCha8Rng::seed_from_u64(
-        seed ^ (cell_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15),
-    );
+    let mut rng =
+        ChaCha8Rng::seed_from_u64(seed ^ (cell_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
 
     // k-means++ init: first centroid uniform at random, the rest ∝ D².
     let mut centroids: Vec<[f32; 3]> = Vec::with_capacity(k);

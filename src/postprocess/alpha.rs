@@ -29,8 +29,8 @@ fn otsu_threshold(img: &RgbaImage) -> Option<u8> {
         return None;
     }
     let mut sum: u64 = 0;
-    for i in 0..256 {
-        sum += (i as u64) * (hist[i] as u64);
+    for (i, count) in hist.iter().enumerate() {
+        sum += (i as u64) * (*count as u64);
     }
     let mut sum_b: u64 = 0;
     let mut w_b: u32 = 0;

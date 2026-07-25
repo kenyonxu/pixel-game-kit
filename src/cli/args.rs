@@ -169,12 +169,10 @@ pub fn parse_cli_args(args: &[String]) -> Result<CliCommand> {
                     "dominant" => crate::resample::ResampleMethod::Dominant,
                     "mode" => crate::resample::ResampleMethod::Mode,
                     "qvote" => crate::resample::ResampleMethod::Qvote,
-                    _ => {
-                        return Err(PixelSnapperError::InvalidInput(format!(
-                            "invalid --resample '{}' (expected majority|median|dominant|mode|qvote)",
-                            val
-                        )))
-                    }
+                    _ => return Err(PixelSnapperError::InvalidInput(format!(
+                        "invalid --resample '{}' (expected majority|median|dominant|mode|qvote)",
+                        val
+                    ))),
                 };
                 i += 2;
             }
@@ -186,9 +184,12 @@ pub fn parse_cli_args(args: &[String]) -> Result<CliCommand> {
                 };
                 match val.parse::<usize>() {
                     Ok(n) if (1..=9).contains(&n) => config.resample_sample_window = n,
-                    _ => return Err(PixelSnapperError::InvalidInput(format!(
-                        "invalid --sample-window '{}' (expected 1-9)", val
-                    ))),
+                    _ => {
+                        return Err(PixelSnapperError::InvalidInput(format!(
+                            "invalid --sample-window '{}' (expected 1-9)",
+                            val
+                        )))
+                    }
                 }
                 i += 2;
             }
@@ -400,7 +401,7 @@ pub fn parse_cli_args(args: &[String]) -> Result<CliCommand> {
                                 val
                             )))
                         }
-                    }
+                    },
                 };
                 i += 2;
             }
@@ -448,7 +449,11 @@ fn parse_hex_color(s: &str) -> Result<[u8; 3]> {
             ))
         })
     };
-    Ok([parse_channel(0..2)?, parse_channel(2..4)?, parse_channel(4..6)?])
+    Ok([
+        parse_channel(0..2)?,
+        parse_channel(2..4)?,
+        parse_channel(4..6)?,
+    ])
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
