@@ -7,6 +7,7 @@ import ConfigForm from "@/components/ConfigForm";
 import CandidateGrid from "@/components/CandidateGrid";
 import CompareView from "@/components/CompareView";
 import Summary from "@/components/Summary";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -65,7 +66,9 @@ export default function App() {
             <div className="space-y-5">
               <UploadZone />
               <Separator />
-              <ConfigForm />
+              <ErrorBoundary label="Config form">
+                <ConfigForm />
+              </ErrorBoundary>
             </div>
           </ScrollArea>
           <div className="p-4 border-t border-border space-y-2">
@@ -101,9 +104,15 @@ export default function App() {
               </div>
             ) : (
               <div className="max-w-2xl mx-auto space-y-5">
-                <CandidateGrid onProcess={handleProcess} />
-                <CompareView />
-                <Summary />
+                <ErrorBoundary label="Candidate grid">
+                  <CandidateGrid onProcess={handleProcess} />
+                </ErrorBoundary>
+                <ErrorBoundary label="Compare view">
+                  <CompareView />
+                </ErrorBoundary>
+                <ErrorBoundary label="Summary">
+                  <Summary />
+                </ErrorBoundary>
               </div>
             )}
           </ScrollArea>
