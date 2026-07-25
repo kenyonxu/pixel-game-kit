@@ -449,6 +449,17 @@ done | tee -a .phase0-baseline.log
 - bundle 体积：React + shadcn + RJSF 可能 200KB+ gz → code split（调色板编辑器/放大镜 lazy load）
 - 预设 schema 演进：靠 version + 迁移器（C 已定）
 
+### 实施记录
+
+- **MVP 落地**（commits `72e7951`→`2b32c1c`）：10 task 全做（schema / scaffold+主题 / worker+adapter / store / 6 组件 / App 组装 / 删 index.html）。Rust 核心 68 测、adapter 5 测全过
+- **Cleanup**（branch `fix/phase6-cleanup`，2026-07-25）：post-pull review 查出 3 CRITICAL + 5 HIGH + 若干 MEDIUM，逐一修：
+  - **CRITICAL**：worker 改用 `wasm-loader` 单例（不再每次新建→WASM 重载，修 U12.5）；`canProcess` 去 `!result`（可调参重跑）；候选点击 → `setConfig` + 重跑（U2.2）
+  - **HIGH**：Object URL 泄漏（CompareView `useMemo` + `setResult`/`reset` 回收旧 URL）；Candidate 类型化（去 `any`）；worker 消息类型校验 + 去竞态；删主线程 `init()`（worker 自己 init）
+  - **MEDIUM**：全局 paste、可关 error、Lucide Reset、Header 四态、`liveValidate` 关
+  - **build 解锁**（pre-existing scaffold 隐患）：TS6 baseUrl 废弃、vite `test` 字段需 `vitest/config`、`@pkg` 类型声明、TS5.7 `Uint8Array<ArrayBufferLike>` vs `BlobPart`（`bytesToObjectUrl` helper）、main.tsx 多余 React import → `npm run build` 从只 dev-能跑变 production-能跑
+  - **延后**：postprocess 折叠（RJSF core 无原生 collapsible，需自定义 ObjectFieldTemplate——非 cheap fix）；布局微调、reduced-motion、候选真预览
+- **验证**：Vitest 8 passed（adapter 5 + store 3）、`npm run build` clean（JS gz 206KB < 250KB 目标、wasm gz 260KB）、cargo test 68、wasm 0 warning。手动 7 步 e2e 待浏览器跑（重点：调参重跑 ✓、候选点击改输出 ✓、反复跑不卡 ✓）
+
 ---
 
 ## 跨 Phase：测试与质量

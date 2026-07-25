@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { PipelineConfig } from "./wasm/adapter";
 import { DEFAULT_CONFIG } from "./wasm/adapter";
+import type { Candidate } from "./wasm/wasm-loader";
 
 export type Status = "loading_wasm" | "ready" | "processing" | "error";
 
@@ -26,7 +27,7 @@ interface State {
   inputMeta: InputMeta | null;
   config: PipelineConfig;
   result: Result | null;
-  candidates: any[];
+  candidates: Candidate[];
   selectedCandidate: number | null;
   // actions
   setStatus: (s: Status) => void;
@@ -34,13 +35,13 @@ interface State {
   setImage: (bytes: Uint8Array, meta: InputMeta) => void;
   setConfig: (patch: Partial<PipelineConfig>) => void;
   setResult: (r: Result) => void;
-  setCandidates: (c: any[]) => void;
+  setCandidates: (c: Candidate[]) => void;
   selectCandidate: (i: number | null) => void;
   reset: () => void;
 }
 
 export const useStore = create<State>((set) => ({
-  status: "loading_wasm",
+  status: "ready",
   error: null,
   inputBytes: null,
   inputMeta: null,
@@ -52,8 +53,16 @@ export const useStore = create<State>((set) => ({
   setError: (error) => set({ error, status: error ? "error" : "ready" }),
   setImage: (inputBytes, inputMeta) => set({ inputBytes, inputMeta, result: null, candidates: [], selectedCandidate: null }),
   setConfig: (patch) => set((s) => ({ config: { ...s.config, ...patch } })),
-  setResult: (result) => set({ result, status: "ready" }),
+  setResult: (result) =>
+    set((s) => {
+      if (s.result?.url) URL.revokeObjectURL(s.result.url);
+      return { result, status: "ready" };
+    }),
   setCandidates: (candidates) => set({ candidates }),
   selectCandidate: (selectedCandidate) => set({ selectedCandidate }),
-  reset: () => set({ inputBytes: null, inputMeta: null, result: null, candidates: [], selectedCandidate: null, error: null, status: "ready" }),
+  reset: () =>
+    set((s) => {
+      if (s.result?.url) URL.revokeObjectURL(s.result.url);
+      return { inputBytes: null, inputMeta: null, result: null, candidates: [], selectedCandidate: null, error: null, status: "ready" };
+    }),
 }));
