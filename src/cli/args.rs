@@ -52,6 +52,7 @@ pub fn print_cli_help() {
             "OPTIONS:\n",
             "  --pixel-size <PIXELS>                       Override the auto-detected pixel size\n",
             "  --palette <HEX,...>                         Use comma-separated 6-digit hex palette colors\n",
+            "  --palette-from <REF.png>                    Derive a palette from a reference image and snap to it\n",
             "  --detect <auto|runs|tiled|elastic>          Grid detection strategy [default: auto]\n",
             "  --resample <majority|median|dominant|mode|qvote>  Grid-cell reduction [default: majority]\n",
             "  --sample-window <1-9>                       Median neighborhood [default: 3]\n",
@@ -135,6 +136,15 @@ pub fn parse_cli_args(args: &[String]) -> Result<CliCommand> {
                 };
 
                 config.palette = Some(parse_palette_hex(val)?);
+                i += 2;
+            }
+            "--palette-from" => {
+                let Some(val) = args.get(i + 1) else {
+                    return Err(PixelSnapperError::InvalidInput(
+                        "--palette-from requires a value".to_string(),
+                    ));
+                };
+                config.palette_from_path = Some(val.clone());
                 i += 2;
             }
             "--detect" => {

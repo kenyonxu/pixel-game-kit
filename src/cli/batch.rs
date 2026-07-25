@@ -64,13 +64,41 @@ pub enum BatchEvent {
     },
 }
 
+/// Resolve `--palette-from`: if set and no explicit `--palette` was given,
+/// load the reference image, extract its Oklab k-means palette, and set it as
+/// `config.palette`. Explicit `--palette` wins (precedence). Called once at the
+/// top of `process`, so single-file and batch both inherit the resolved palette.
+fn resolve_palette_from(config: &mut Config) -> Result<()> {
+    if config.palette.is_some() {
+        return Ok(()); // explicit --palette takes precedence
+    }
+    let Some(ref_path) = config.palette_from_path.clone() else {
+        return Ok(());
+    };
+    let bytes = std::fs::read(&ref_path).map_err(|e| {
+        PixelSnapperError::ProcessingError(format!(
+            "Failed to read palette reference '{}': {}",
+            ref_path, e
+        ))
+    })?;
+    let palette = crate::palette::extract_palette_from_image_via_bytes(
+        &bytes,
+        config.k_colors,
+        config.quantize_colorspace,
+    )?;
+    config.palette = Some(palette);
+    Ok(())
+}
+
 #[allow(dead_code)]
 pub fn process(config: &Config) -> Result<()> {
+    let mut config = config.clone();
+    resolve_palette_from(&mut config)?;
     let input_path = Path::new(&config.input_path);
     if input_path.is_dir() {
-        process_batch(config)
+        process_batch(&config)
     } else {
-        process_single(config)
+        process_single(&config)
     }
 }
 

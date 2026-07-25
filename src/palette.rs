@@ -92,7 +92,6 @@ pub fn apply_palette(img: &RgbaImage, palette: &[[u8; 3]]) -> Result<RgbaImage> 
 /// output is a clean k-color reduction). Returns unique opaque RGB colors,
 /// sorted for deterministic output. Used by `--palette-from` / WASM
 /// `extract_palette` to lock a target frame to a reference frame's palette.
-#[allow(dead_code)] // wired up in Task 3 (CLI) + Task 4 (WASM); tests below use it under cfg(test)
 pub(crate) fn extract_palette_from_image(
     img: &RgbaImage,
     k_colors: usize,
@@ -117,6 +116,17 @@ pub(crate) fn extract_palette_from_image(
     }
     palette.sort();
     Ok(palette)
+}
+
+/// Bytes-loading wrapper around `extract_palette_from_image`. Used by the CLI
+/// `--palette-from` resolver and the WASM `extract_palette` export.
+pub(crate) fn extract_palette_from_image_via_bytes(
+    bytes: &[u8],
+    k_colors: usize,
+    colorspace: Colorspace,
+) -> Result<Vec<[u8; 3]>> {
+    let img = image::load_from_memory(bytes)?.to_rgba8();
+    extract_palette_from_image(&img, k_colors, colorspace)
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
