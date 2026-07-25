@@ -1,6 +1,4 @@
-use pixel_game_kit::detect::{
-    detect, select_best, CutMethod, DetectStrategy,
-};
+use pixel_game_kit::detect::{detect, select_best, CutMethod, DetectStrategy};
 
 fn load_fixture(name: &str) -> image::RgbaImage {
     let bytes = std::fs::read(format!("tests/fixtures/baseline/{}", name)).unwrap();
@@ -15,9 +13,9 @@ fn elastic_returns_walker_candidate_for_ai_sprite() {
     // pass empty profiles and let detect_elastic recompute via profile module.
     let config = pixel_game_kit::Config::default();
     let cands = detect(&img, &[], &[], w, h, &config, DetectStrategy::Elastic);
-    assert!(cands.iter().any(|c| {
-        c.detector == DetectStrategy::Elastic && c.cut_method == CutMethod::Walker
-    }));
+    assert!(cands
+        .iter()
+        .any(|c| { c.detector == DetectStrategy::Elastic && c.cut_method == CutMethod::Walker }));
 }
 #[test]
 fn runs_detects_clean_fixture() {

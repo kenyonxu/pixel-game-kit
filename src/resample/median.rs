@@ -37,7 +37,15 @@ pub(crate) fn resample_median(
             for dy in -half..=half {
                 for dx in -half..=half {
                     let (x, y) = (cx + dx, cy + dy);
-                    if x < xs || x >= xe || y < ys || y >= ye || x < 0 || y < 0 || x >= iw || y >= ih {
+                    if x < xs
+                        || x >= xe
+                        || y < ys
+                        || y >= ye
+                        || x < 0
+                        || y < 0
+                        || x >= iw
+                        || y >= ih
+                    {
                         continue;
                     }
                     let p = img.get_pixel(x as u32, y as u32).0;

@@ -8,6 +8,7 @@ mod config;
 pub mod detect;
 mod error;
 mod palette;
+mod postprocess;
 mod profile;
 mod quantize;
 pub mod resample;
@@ -20,18 +21,112 @@ pub use error::{PixelSnapperError, Result};
 #[cfg(not(target_arch = "wasm32"))]
 pub use cli::run_cli;
 
+use detect::{detect, select_best, CutMethod, DetectStrategy, DetectionCandidate};
 use image::GenericImageView;
-use detect::{detect, select_best, CutMethod, DetectionCandidate, DetectStrategy};
 use palette::apply_palette;
 // Only the wasm32 `process_image` export parses palette hex strings.
 #[cfg(target_arch = "wasm32")]
 use palette::parse_palette_hex;
 use profile::{compute_profiles, estimate_step_size, resolve_step_sizes};
-use stabilize::{snap_uniform_cuts, walk, stabilize_both_axes};
+use stabilize::{snap_uniform_cuts, stabilize_both_axes, walk};
 use validate::validate_image_dimensions;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
+
+#[cfg(target_arch = "wasm32")]
+#[derive(serde::Deserialize, Default)]
+#[serde(default)]
+struct PostConfig {
+    bg_remove: Option<bool>,
+    bg_tolerance: Option<u8>,
+    bg_connectivity: Option<String>,
+    bg_scope: Option<String>,
+    bg_floating_threshold: Option<usize>,
+    outline: Option<String>,
+    outline_color: Option<String>,
+    morph: Option<bool>,
+    alpha_threshold: Option<String>,
+}
+
+#[cfg(target_arch = "wasm32")]
+fn apply_post_config(
+    config: &mut Config,
+    json: &str,
+) -> std::result::Result<(), wasm_bindgen::JsValue> {
+    let pc: PostConfig = serde_json::from_str(json).map_err(|e| {
+        wasm_bindgen::JsValue::from_str(&format!("invalid post_config JSON: {}", e))
+    })?;
+    if let Some(v) = pc.bg_remove {
+        config.post_bg_remove = v;
+    }
+    if let Some(v) = pc.bg_tolerance {
+        config.post_bg_tolerance = v;
+    }
+    if let Some(v) = pc.bg_connectivity {
+        config.post_bg_connectivity = match v.as_str() {
+            "4" => postprocess::BgConnectivity::Conn4,
+            "8" => postprocess::BgConnectivity::Conn8,
+            _ => {
+                return Err(wasm_bindgen::JsValue::from_str(
+                    "bg_connectivity must be 4|8",
+                ))
+            }
+        };
+    }
+    if let Some(v) = pc.bg_scope {
+        config.post_bg_scope = match v.as_str() {
+            "outer" => postprocess::BgScope::Outer,
+            "all" => postprocess::BgScope::All,
+            _ => {
+                return Err(wasm_bindgen::JsValue::from_str(
+                    "bg_scope must be outer|all",
+                ))
+            }
+        };
+    }
+    if let Some(v) = pc.bg_floating_threshold {
+        config.post_bg_floating_max_pixels = v;
+    }
+    if let Some(v) = pc.outline {
+        config.post_outline = match v.as_str() {
+            "none" => postprocess::OutlineStyle::None,
+            "rounded" => postprocess::OutlineStyle::Rounded,
+            "sharp" => postprocess::OutlineStyle::Sharp,
+            _ => {
+                return Err(wasm_bindgen::JsValue::from_str(
+                    "outline must be none|rounded|sharp",
+                ))
+            }
+        };
+    }
+    if let Some(v) = pc.outline_color {
+        let cols = parse_palette_hex(&v).map_err(wasm_bindgen::JsValue::from)?;
+        if cols.len() != 1 {
+            return Err(wasm_bindgen::JsValue::from_str(
+                "outline_color must be a single hex color",
+            ));
+        }
+        config.post_outline_color = cols[0];
+    }
+    if let Some(v) = pc.morph {
+        config.post_morph = v;
+    }
+    if let Some(v) = pc.alpha_threshold {
+        config.post_alpha_threshold = match v.as_str() {
+            "auto" => postprocess::AlphaThreshold::Auto,
+            n => match n.parse::<u8>() {
+                Ok(t) => postprocess::AlphaThreshold::Fixed(t),
+                Err(_) => {
+                    return Err(wasm_bindgen::JsValue::from_str(
+                        "alpha_threshold must be 0-255 or auto",
+                    ))
+                }
+            },
+        };
+    }
+    Ok(())
+}
 
 #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub(crate) struct ProcessedImage {
@@ -45,7 +140,10 @@ pub(crate) struct ProcessedImage {
 }
 
 /// Shared pipeline entry point for both the CLI and WASM targets.
-pub(crate) fn process_image_common(input_bytes: &[u8], config: Option<Config>) -> Result<ProcessedImage> {
+pub(crate) fn process_image_common(
+    input_bytes: &[u8],
+    config: Option<Config>,
+) -> Result<ProcessedImage> {
     let config = config.unwrap_or_default();
 
     let img = image::load_from_memory(input_bytes)?;
@@ -135,10 +233,12 @@ pub(crate) fn process_image_common(input_bytes: &[u8], config: Option<Config>) -
     };
 
     let snapped_img = resample::resample(&analysis_img, &col_cuts, &row_cuts, &config)?;
-    let output_img = match config.palette.as_deref() {
+    let palette_img = match config.palette.as_deref() {
         Some(palette) => apply_palette(&snapped_img, palette)?,
         None => snapped_img,
     };
+    let output_img = postprocess::run(palette_img, &config);
+    let (out_w, out_h) = output_img.dimensions();
 
     // Returns bytes for both implementations
     let mut output_bytes = Vec::new();
@@ -151,8 +251,8 @@ pub(crate) fn process_image_common(input_bytes: &[u8], config: Option<Config>) -
         output_bytes,
         pixel_size: chosen.step,
         pixel_size_override: config.pixel_size_override.is_some(),
-        output_width: (col_cuts.len() - 1) as u32,
-        output_height: (row_cuts.len() - 1) as u32,
+        output_width: out_w,
+        output_height: out_h,
         selected_detector,
         candidates,
     })
@@ -172,6 +272,7 @@ pub fn process_image(
     colorspace: Option<String>,
     dither: Option<String>,
     preset_palette: Option<String>,
+    post_config: Option<String>,
 ) -> std::result::Result<Vec<u8>, wasm_bindgen::JsValue> {
     let mut config = Config::default();
     if let Some(k) = k_colors {
@@ -209,9 +310,11 @@ pub fn process_image(
             "median" => resample::ResampleMethod::Median,
             "dominant" => resample::ResampleMethod::Dominant,
             "mode" => resample::ResampleMethod::Mode,
-            _ => return Err(wasm_bindgen::JsValue::from_str(
-                "resample_method must be majority|median|dominant|mode",
-            )),
+            _ => {
+                return Err(wasm_bindgen::JsValue::from_str(
+                    "resample_method must be majority|median|dominant|mode",
+                ))
+            }
         };
     }
 
@@ -219,9 +322,11 @@ pub fn process_image(
         config.quantize_colorspace = match s.as_str() {
             "rgb" => quantize::Colorspace::Rgb,
             "oklab" => quantize::Colorspace::Oklab,
-            _ => return Err(wasm_bindgen::JsValue::from_str(
-                "colorspace must be rgb|oklab",
-            )),
+            _ => {
+                return Err(wasm_bindgen::JsValue::from_str(
+                    "colorspace must be rgb|oklab",
+                ))
+            }
         };
     }
     if let Some(s) = dither {
@@ -232,9 +337,11 @@ pub fn process_image(
             "bayer4" => quantize::DitherMethod::Bayer4,
             "bayer8" => quantize::DitherMethod::Bayer8,
             "ordered" => quantize::DitherMethod::Ordered,
-            _ => return Err(wasm_bindgen::JsValue::from_str(
-                "dither must be none|fs|bayer2|bayer4|bayer8|ordered",
-            )),
+            _ => {
+                return Err(wasm_bindgen::JsValue::from_str(
+                    "dither must be none|fs|bayer2|bayer4|bayer8|ordered",
+                ))
+            }
         };
     }
     if let Some(s) = preset_palette {
@@ -253,6 +360,10 @@ pub fn process_image(
                 "preset_palette must be none|nes|gameboy|sgb|snes|pc9801|msx1|pico8|sweetie16|endesga32",
             )),
         };
+    }
+
+    if let Some(json) = post_config {
+        apply_post_config(&mut config, &json)?;
     }
 
     process_image_common(input_bytes, Some(config))

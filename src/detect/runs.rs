@@ -1,7 +1,7 @@
 //! Runs detector: GCD of same-color run lengths (integer scale), with posterize
 //! preprocessing to suppress single-pixel noise that would collapse the GCD.
 
-use crate::detect::{CutMethod, DetectionCandidate, DetectStrategy};
+use crate::detect::{CutMethod, DetectStrategy, DetectionCandidate};
 use crate::Config;
 use image::{Rgba, RgbaImage};
 

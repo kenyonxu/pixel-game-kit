@@ -49,8 +49,7 @@ fn majority_default_matches_anchor() {
     ]));
     let h = sha256(&out);
     assert_eq!(
-        h,
-        "3a589ee93b8cd2e493baa0d6fb314d279b54a1104165ad754ad4ff6d359e4420",
+        h, "3a589ee93b8cd2e493baa0d6fb314d279b54a1104165ad754ad4ff6d359e4420",
         "default majority must match Phase 3 Oklab anchor"
     );
 }

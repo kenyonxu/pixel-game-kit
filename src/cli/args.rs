@@ -59,6 +59,15 @@ pub fn print_cli_help() {
             "  --dither <none|fs|bayer2|bayer4|bayer8|ordered>  Dithering [default: none]\n",
             "  --dither-strength <0-2>                     Dither strength [default: 1.0]\n",
             "  --preset <name>                             Snap to preset palette [default: none]\n",
+            "  --bg-remove                                Enable background removal\n",
+            "  --bg-tolerance <0-255>                     Per-channel bg tolerance [default: 64]\n",
+            "  --bg-connectivity <4|8>                    Flood connectivity [default: 4]\n",
+            "  --bg-scope <outer|all>                     Removal scope [default: outer]\n",
+            "  --bg-floating-threshold <n>                Floating-island cleanup size (0=off) [default: 0]\n",
+            "  --outline <rounded|sharp>                  Outline style [default: off]\n",
+            "  --outline-color <hex>                      Outline color [default: 000000]\n",
+            "  --morph                                    Enable 2x2 open->close (alpha-only)\n",
+            "  --alpha-threshold <n|auto>                 Alpha binarize (strict >) [default: off]\n",
             "  --json                                      Output detection candidates as JSON instead of processing\n",
             "  -h, --help                                  Print help\n",
             "  -V, --version                               Print version\n\n",
@@ -160,12 +169,10 @@ pub fn parse_cli_args(args: &[String]) -> Result<CliCommand> {
                     "dominant" => crate::resample::ResampleMethod::Dominant,
                     "mode" => crate::resample::ResampleMethod::Mode,
                     "qvote" => crate::resample::ResampleMethod::Qvote,
-                    _ => {
-                        return Err(PixelSnapperError::InvalidInput(format!(
-                            "invalid --resample '{}' (expected majority|median|dominant|mode|qvote)",
-                            val
-                        )))
-                    }
+                    _ => return Err(PixelSnapperError::InvalidInput(format!(
+                        "invalid --resample '{}' (expected majority|median|dominant|mode|qvote)",
+                        val
+                    ))),
                 };
                 i += 2;
             }
@@ -177,9 +184,12 @@ pub fn parse_cli_args(args: &[String]) -> Result<CliCommand> {
                 };
                 match val.parse::<usize>() {
                     Ok(n) if (1..=9).contains(&n) => config.resample_sample_window = n,
-                    _ => return Err(PixelSnapperError::InvalidInput(format!(
-                        "invalid --sample-window '{}' (expected 1-9)", val
-                    ))),
+                    _ => {
+                        return Err(PixelSnapperError::InvalidInput(format!(
+                            "invalid --sample-window '{}' (expected 1-9)",
+                            val
+                        )))
+                    }
                 }
                 i += 2;
             }
@@ -270,6 +280,135 @@ pub fn parse_cli_args(args: &[String]) -> Result<CliCommand> {
                 };
                 i += 2;
             }
+            "--bg-remove" | "--remove-bg" => {
+                config.post_bg_remove = true;
+                i += 1;
+            }
+            "--bg-tolerance" => {
+                let Some(val) = args.get(i + 1) else {
+                    return Err(PixelSnapperError::InvalidInput(
+                        "--bg-tolerance requires a value".to_string(),
+                    ));
+                };
+                match val.parse::<u8>() {
+                    Ok(n) => config.post_bg_tolerance = n,
+                    _ => {
+                        return Err(PixelSnapperError::InvalidInput(format!(
+                            "invalid --bg-tolerance '{}' (expected 0-255)",
+                            val
+                        )))
+                    }
+                }
+                i += 2;
+            }
+            "--bg-connectivity" => {
+                let Some(val) = args.get(i + 1) else {
+                    return Err(PixelSnapperError::InvalidInput(
+                        "--bg-connectivity requires a value".to_string(),
+                    ));
+                };
+                config.post_bg_connectivity = match val.as_str() {
+                    "4" => crate::postprocess::BgConnectivity::Conn4,
+                    "8" => crate::postprocess::BgConnectivity::Conn8,
+                    _ => {
+                        return Err(PixelSnapperError::InvalidInput(format!(
+                            "invalid --bg-connectivity '{}' (expected 4|8)",
+                            val
+                        )))
+                    }
+                };
+                i += 2;
+            }
+            "--bg-scope" => {
+                let Some(val) = args.get(i + 1) else {
+                    return Err(PixelSnapperError::InvalidInput(
+                        "--bg-scope requires a value".to_string(),
+                    ));
+                };
+                config.post_bg_scope = match val.as_str() {
+                    "outer" => crate::postprocess::BgScope::Outer,
+                    "all" => crate::postprocess::BgScope::All,
+                    _ => {
+                        return Err(PixelSnapperError::InvalidInput(format!(
+                            "invalid --bg-scope '{}' (expected outer|all)",
+                            val
+                        )))
+                    }
+                };
+                i += 2;
+            }
+            "--bg-floating-threshold" => {
+                let Some(val) = args.get(i + 1) else {
+                    return Err(PixelSnapperError::InvalidInput(
+                        "--bg-floating-threshold requires a value".to_string(),
+                    ));
+                };
+                match val.parse::<usize>() {
+                    Ok(n) => config.post_bg_floating_max_pixels = n,
+                    _ => {
+                        return Err(PixelSnapperError::InvalidInput(format!(
+                            "invalid --bg-floating-threshold '{}' (expected non-negative integer)",
+                            val
+                        )))
+                    }
+                }
+                i += 2;
+            }
+            "--outline" => {
+                let Some(val) = args.get(i + 1) else {
+                    return Err(PixelSnapperError::InvalidInput(
+                        "--outline requires a value".to_string(),
+                    ));
+                };
+                config.post_outline = match val.as_str() {
+                    "rounded" => crate::postprocess::OutlineStyle::Rounded,
+                    "sharp" => crate::postprocess::OutlineStyle::Sharp,
+                    _ => {
+                        return Err(PixelSnapperError::InvalidInput(format!(
+                            "invalid --outline '{}' (expected rounded|sharp)",
+                            val
+                        )))
+                    }
+                };
+                i += 2;
+            }
+            "--outline-color" => {
+                let Some(val) = args.get(i + 1) else {
+                    return Err(PixelSnapperError::InvalidInput(
+                        "--outline-color requires a value".to_string(),
+                    ));
+                };
+                config.post_outline_color = parse_hex_color(val)?;
+                i += 2;
+            }
+            "--morph" | "--morphology" => {
+                config.post_morph = true;
+                i += 1;
+            }
+            "--alpha-threshold" => {
+                let Some(val) = args.get(i + 1) else {
+                    return Err(PixelSnapperError::InvalidInput(
+                        "--alpha-threshold requires a value".to_string(),
+                    ));
+                };
+                config.post_alpha_threshold = match val.as_str() {
+                    "auto" => crate::postprocess::AlphaThreshold::Auto,
+                    n => match n.parse::<u8>() {
+                        Ok(t) => crate::postprocess::AlphaThreshold::Fixed(t),
+                        _ => {
+                            return Err(PixelSnapperError::InvalidInput(format!(
+                                "invalid --alpha-threshold '{}' (expected 0-255 or auto)",
+                                val
+                            )))
+                        }
+                    },
+                };
+                i += 2;
+            }
+            "--binarize" => {
+                config.post_alpha_threshold = crate::postprocess::AlphaThreshold::Fixed(128);
+                i += 1;
+            }
             arg if arg.starts_with("--") => {
                 return Err(PixelSnapperError::InvalidInput(format!(
                     "unknown argument '{}'",
@@ -292,4 +431,44 @@ pub fn parse_cli_args(args: &[String]) -> Result<CliCommand> {
     }
 
     Ok(CliCommand::Run(config))
+}
+
+fn parse_hex_color(s: &str) -> Result<[u8; 3]> {
+    let hex = s.trim_start_matches('#');
+    if hex.len() != 6 {
+        return Err(PixelSnapperError::InvalidInput(format!(
+            "invalid outline color '{}' (expected 6-digit hex, e.g. ff00ff)",
+            s
+        )));
+    }
+    let parse_channel = |range: std::ops::Range<usize>| -> Result<u8> {
+        u8::from_str_radix(&hex[range.start..range.end], 16).map_err(|_| {
+            PixelSnapperError::InvalidInput(format!(
+                "invalid outline color '{}' (expected 6-digit hex)",
+                s
+            ))
+        })
+    };
+    Ok([
+        parse_channel(0..2)?,
+        parse_channel(2..4)?,
+        parse_channel(4..6)?,
+    ])
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_hex_color_accepts_hash_and_plain() {
+        assert_eq!(parse_hex_color("#ff00aa").unwrap(), [255, 0, 170]);
+        assert_eq!(parse_hex_color("00aaFF").unwrap(), [0, 170, 255]);
+    }
+
+    #[test]
+    fn parse_hex_color_rejects_invalid() {
+        assert!(parse_hex_color("gg00aa").is_err());
+        assert!(parse_hex_color("ff00a").is_err());
+    }
 }

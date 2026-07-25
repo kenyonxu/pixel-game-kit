@@ -80,8 +80,7 @@ fn oklab_default_is_deterministic() {
     // Oklab is a different coordinate space — output MUST differ from the RGB
     // anchor. If they matched, the colorspace switch would be a no-op.
     assert_ne!(
-        h1,
-        "8028577762af407b84ce6edb38bf60491973e246c2326dad9f6c7fe8434c9f22",
+        h1, "8028577762af407b84ce6edb38bf60491973e246c2326dad9f6c7fe8434c9f22",
         "Oklab default must differ from RGB anchor"
     );
     assert!(!h1.is_empty());
@@ -108,12 +107,7 @@ fn each_dither_runs() {
             "dither {} failed",
             d,
         );
-        assert_eq!(
-            sha(&out).len(),
-            64,
-            "dither {} produced no valid output",
-            d,
-        );
+        assert_eq!(sha(&out).len(), 64, "dither {} produced no valid output", d,);
     }
 }
 

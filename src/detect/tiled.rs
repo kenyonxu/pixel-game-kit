@@ -1,7 +1,7 @@
 //! Tiled detector: 3x3 overlapping tiles, Sobel edge profile per tile,
 //! autocorrelation peak-lag -> per-tile scale, mode vote.
 
-use crate::detect::{CutMethod, DetectionCandidate, DetectStrategy};
+use crate::detect::{CutMethod, DetectStrategy, DetectionCandidate};
 use crate::Config;
 use image::RgbaImage;
 use std::collections::HashMap;
@@ -76,8 +76,12 @@ pub fn detect_tiled(img: &RgbaImage, config: &Config) -> Option<DetectionCandida
 
     for ty in 0u32..3 {
         for tx in 0u32..3 {
-            let x0 = tx.saturating_mul(tile_w).saturating_sub(if tx > 0 { overlap_w } else { 0 });
-            let y0 = ty.saturating_mul(tile_h).saturating_sub(if ty > 0 { overlap_h } else { 0 });
+            let x0 = tx
+                .saturating_mul(tile_w)
+                .saturating_sub(if tx > 0 { overlap_w } else { 0 });
+            let y0 = ty
+                .saturating_mul(tile_h)
+                .saturating_sub(if ty > 0 { overlap_h } else { 0 });
             let x1 = ((tx + 1).min(3)).saturating_mul(tile_w).min(w);
             let y1 = ((ty + 1).min(3)).saturating_mul(tile_h).min(h);
             if x1 <= x0 + 2 || y1 <= y0 + 2 {

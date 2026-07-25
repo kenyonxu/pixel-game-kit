@@ -280,20 +280,37 @@ done | tee -a .phase0-baseline.log
 
 ### 任务
 
-- [ ] `postprocess/floodfill.rs`：栈式 flood-fill（非递归），按通道绝对差容差，4/8 连通，scope `Outer/Selected/All`
-- [ ] `postprocess/floodfill.rs` 内 `remove_small_floating_components`：BFS 连通分量，小于阈值且非最大分量置零
-- [ ] `postprocess/outline.rs`：扩 1px canvas，扫描透明像素，rounded=8 邻域 / sharp=4 邻域，单像素厚度
-- [ ] `postprocess/morphology.rs`：2×2 kernel open→close（erode=min/dilate=max），per-channel，replicate border
-- [ ] `postprocess/alpha.rs`：固定阈值（默认 128）+ Otsu 自适应（超越 unfake 的硬阈值）
-- [ ] `Config.postprocess`：`bg_removal` / `outline` / `morph` / `alpha_binarize` 各自开关 + 参数
-- [ ] CLI `--bg-remove` / `--outline <rounded|sharp>` / `--morph` / `--alpha-threshold <n|auto>`
-- [ ] 回归测试：带背景 fixture、描边 fixture、噪点 fixture
+- [x] `postprocess/floodfill.rs`：栈式 flood-fill（非递归），按通道绝对差容差，4/8 连通，scope `Outer/All`（`Selected` 推迟到 Phase 6 Web 有选区 UI）
+- [x] `postprocess/floodfill.rs` 内 `remove_small_floating_components`：4-连连通分量 CCL，小于阈值且非最大分量置零（最大分量永远存活）
+- [x] `postprocess/outline.rs`：扩 1px canvas（dims +2），扫描透明像素，rounded=8 邻域 / sharp=4 邻域，单像素厚度
+- [x] `postprocess/morphology.rs`：2×2 kernel open→close（erode=min/dilate=max），**alpha-only**（保调色板，偏离 unfake per-channel），replicate border
+- [x] `postprocess/alpha.rs`：固定阈值严格 `>`（默认 128）+ Otsu 自适应（两源码库均无，全新实现，超越 unfake 的硬阈值）
+- [x] `Config` 9 个 `post_*` 平铺字段（默认全关 → 零回归）
+- [x] CLI 9 flag：`--bg-remove` / `--bg-tolerance` / `--bg-connectivity` / `--bg-scope` / `--bg-floating-threshold` / `--outline <none|rounded|sharp>` / `--outline-color <hex>` / `--morph` / `--alpha-threshold <n|auto>`
+- [x] WASM `process_image` 加 `post_config: Option<String>` JSON 参数（Option B，为 Phase 6 PipelineConfig 铺路）
+- [x] 回归测试：`tests/postprocess.rs`（锚定锁 + 确定性 + CLI e2e）+ 各 op 内联单元测试（22 个）
 
 ### 验收
-- 背景去除保留主体、清孤立噪点
-- 描边单像素、8/4 向正确
-- morph 填 2×2 孔、去单像素 speckle
-- alpha Otsu 在半透明边缘图上优于硬阈值
+- ✅ 背景去除保主体、清孤立噪点（floating cleanup 最大分量存活）
+- ✅ 描边单像素、dims +2、8/4 向正确
+- ✅ morph 填 2×2 孔、去单像素 speckle，且**不生调色板外色**（alpha-only）
+- ✅ Otsu 在半透明边缘图上优于硬阈值，单峰直方图 fallback 到 128
+- ✅ `cargo test` 57 passed，wasm 0 warning，Oklab 锚 `3a589ee9…e4420` + RGB 锚 `802857…9f22` 保持
+
+### 风险
+- outline 改输出 dims（+2）破坏下游假设 → `ProcessedImage` 报 post-outline 最终 dims；`--json` 候选路径不走 postprocess
+- Otsu 全不透明图（单峰）退化 → 阈值 ∈ {0,255} 时 fallback Fixed(128)
+- flood `All` scope 误删内部同色区域 → 默认 `Outer`；`All` 文档警告
+- WASM `process_image` 加第 10 个参数 `post_config` → 对现有 JS 调用者 breaking，需加参数
+
+### 实施记录
+
+- **分支**：`feat/phase4-postprocess`（4 实现 commit + 1 收尾 commit，已合并 main）
+- **结果**：`postprocess/{mod,floodfill,outline,morphology,alpha}.rs` + Config 9 字段 + CLI 9 flags + WASM `post_config` JSON + `tests/postprocess.rs` + 内联单元测试 22 个
+- **关键决策**（spec）：4 op 独立开关固定序（flood→floating→morph→alpha→outline）；morph alpha-only（保调色板）；`All` scope 用 border 色自推导 target（一致性，偏离源码硬编码 4-way）；Otsu 全新实现（两源码库均无）；WASM 单 JSON 参数（Option B，为 Phase 6 铺路）
+- **偏离源码 3 处**（均文档化）：`All` 连通性尊重配置（源码硬编码 4-way）/ morph alpha-only（源码 per-channel）/ Otsu 新增
+- **收尾**（review 后补齐）：补 `tests/postprocess.rs` 端到端测试、CLAUDE.md 管线表、PLAN.md 勾选、修 2 个 clippy warning（alpha needless_range_loop / morphology let_and_return）
+- **验证**：cargo test 57 passed，wasm 0 warning，Oklab 锚 `3a589ee9…e4420` + RGB 锚 `802857…9f22` 保持（默认全关零回归）
 
 ---
 

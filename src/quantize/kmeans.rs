@@ -29,7 +29,13 @@ pub(crate) fn quantize_kmeans(img: &RgbaImage, config: &Config) -> Result<RgbaIm
 
     let opaque_pixels: Vec<[f32; 3]> = img
         .pixels()
-        .filter_map(|p| if p[3] == 0 { None } else { Some(pixel_to_working(p)) })
+        .filter_map(|p| {
+            if p[3] == 0 {
+                None
+            } else {
+                Some(pixel_to_working(p))
+            }
+        })
         .collect();
     let n_pixels = opaque_pixels.len();
     if n_pixels == 0 {
