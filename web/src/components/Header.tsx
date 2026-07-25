@@ -1,8 +1,16 @@
 import { useStore } from "@/store";
+import { cn } from "@/lib/utils";
+
+const STATE: Record<string, { label: string; dot: string }> = {
+  loading_wasm: { label: "Loading…", dot: "bg-muted-foreground" },
+  ready: { label: "Ready", dot: "bg-primary" },
+  processing: { label: "Processing…", dot: "bg-primary animate-pulse" },
+  error: { label: "Error", dot: "bg-destructive" },
+};
 
 export default function Header() {
   const status = useStore((s) => s.status);
-  const isProcessing = status === "processing";
+  const s = STATE[status] ?? STATE.ready;
 
   return (
     <header className="flex items-center justify-between px-6 py-3 border-b border-border">
@@ -10,15 +18,11 @@ export default function Header() {
         Pixel Game Kit
       </h1>
       <div className="flex items-center gap-3">
-        {isProcessing && (
-          <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            Processing…
-          </span>
-        )}
-        <span className="text-xs text-muted-foreground">
-          all processing runs locally in your browser
+        <span className={cn("inline-flex items-center gap-2 text-sm", status === "error" ? "text-destructive" : "text-muted-foreground")}>
+          <span className={cn("w-2 h-2 rounded-full", s.dot)} />
+          {s.label}
         </span>
+        <span className="text-xs text-muted-foreground/70">all processing runs locally</span>
       </div>
     </header>
   );

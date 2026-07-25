@@ -25,7 +25,7 @@ export default function ConfigForm() {
         onChange={(e) => setConfig(e.formData as typeof config)}
         onSubmit={() => {}}
         onError={() => {}}
-        liveValidate
+        liveValidate={false}
         showErrorList={false}
       >
         {/* no default submit button — we use external process trigger */}
