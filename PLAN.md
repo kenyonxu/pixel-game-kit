@@ -314,7 +314,13 @@ done | tee -a .phase0-baseline.log
 
 ---
 
-## Phase 5 — 矢量化（可选，独立）
+## Phase 5 — 矢量化（可选，独立）❌ 砍掉（2026-07-25）
+
+> **状态：砍掉（deferred indefinitely）。** 矢量化的真实场景窄（logo / 周边 / 印刷，非游戏内 sprite），且需求方多半自己会用 `imagetracer.js` 或 Vectorizer.ai。在 Rust 侧维护一份 bilateral/median/gaussian 滤波 + feature gate 收益太低。
+>
+> **替代方案**：需要矢量化的用户直接在前端调 `imagetracer.js`（或外部工具），核心管线不内嵌。如果未来需求集中，再重启本 phase。
+>
+> 下方原始设计保留作历史记录。
 
 **目标**：raster → SVG。**只移植预处理滤波，tracing 留前端**。
 
