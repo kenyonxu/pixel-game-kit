@@ -348,13 +348,13 @@ done | tee -a .phase0-baseline.log
 
 ### 任务
 
-- [ ] `palette.rs::extract_palette(bytes, k_colors, colorspace) -> Result<Vec<[u8;3]>>`：对参考图跑 Oklab k-means（`dither=None`/`preset=None`，干净 k 色）→ 收集量化输出的 unique RGB（跳过透明像素）→ **排序后**返回（保 hex 稳定）
-- [ ] Config 加 `palette_from_path: Option<String>`（CLI-only，仿 `input_path`，wasm 下 `#[allow(dead_code)]`）
-- [ ] CLI `--palette-from <ref.png>`：设 `palette_from_path`；run 路径加载 ref 一次 → `extract_palette` → 设 `config.palette`。batch 下提取一次应用到全部帧（跨帧一致）
-- [ ] 优先级 `--palette`（显式 hex）> `--palette-from`（导出）> `--preset`；两者同传时 `--palette` 胜，跳过提取
-- [ ] WASM `extract_palette(bytes, k_colors) -> String`（hex），caller 调它拿参考 palette 再当 `palette_hex` 传回 `process_image`（不加 bytes 参数到 process_image）
-- [ ] **Option C**：`nearest_palette_color` 改 Oklab 平方欧氏（复用 `quantize::oklab::rgb_to_oklab`），cache 仍按 unique input RGB（转换每 unique 色一次，不每像素）
-- [ ] 回归测试：`extract_palette` 确定性（同 ref→同 hex，排序保稳定）；跨帧一致（合成 f1 红 220,40,40 + f2 红 215,45,38，从 f1 导 palette 贴两帧→同 palette 项）；Oklab snap 等距测试；默认锚 `3a589ee9…e4420` 不变（无 `--palette` 时 apply_palette 不跑）；受影响 `--palette` 测试锚重锁
+- [x] `palette.rs::extract_palette_from_image(img, k_colors, colorspace)` + `_via_bytes` 包装：对参考图跑 Oklab k-means（`dither=None`/`preset=None`，干净 k 色）→ 收集量化输出的 unique RGB（跳过透明像素）→ **排序后**返回（保 hex 稳定）
+- [x] Config 加 `palette_from_path: Option<String>`（CLI-only，仿 `input_path`，wasm 下 `#[allow(dead_code)]`）
+- [x] CLI `--palette-from <ref.png>`：设 `palette_from_path`；`resolve_palette_from` 在 `cli::process` 顶部加载 ref 一次 → `extract_palette` → 设 `config.palette`。batch 下经 `BatchConfig::from` 继承同一 palette（跨帧一致）
+- [x] 优先级 `--palette`（显式 hex）> `--palette-from`（导出）> `--preset`；`resolve_palette_from` 在 `config.palette.is_some()` 时跳过（`--palette` 胜）
+- [x] WASM `extract_palette(bytes, k_colors) -> String`（hex，经 `palette_to_hex`），caller 调它拿参考 palette 再当 `palette_hex` 传回 `process_image`（不加 bytes 参数到 process_image）
+- [x] **Option C**：`nearest_palette_color` 改 Oklab 平方欧氏（复用 `quantize::oklab::rgb_to_oklab`），cache 仍按 unique input RGB（转换每 unique 色一次，不每像素）
+- [x] 回归测试：`palette::palette_tests`（extract 确定性 / 跳透明 / **cross_frame_lock** / Oklab 最近色 / palette_to_hex）+ `tests/palette.rs`（默认锚不变 / 跨帧锁定 / `--palette` 优先级）；无受影响 `--palette` 测试锚需重锁（tests/ 里无 `--palette` 用例）
 
 ### 验收
 - 同一参考图两次 `extract_palette` → byte 一致 hex（R1）
@@ -367,6 +367,13 @@ done | tee -a .phase0-baseline.log
 - `extract_palette` unique 收集顺序不定（HashSet）→ 排序后再返回（hex 稳定）
 - batch 参考文件缺失/不可读 → 明确错误，不静默回退到逐帧 k-means
 - ref palette 尺寸 < `k_colors`（空聚类）→ 返回实际 uniques，`apply_palette` 处理任意非空 palette
+
+### 实施记录
+
+- **分支**：`feat/phase5.5-palette-lock`（5 实现 commit + 1 收尾 commit，已合并 main）
+- **结果**：`palette.rs::{extract_palette_from_image, extract_palette_from_image_via_bytes, palette_to_hex}`；`nearest_palette_color` 改 Oklab；Config `palette_from_path`；CLI `--palette-from`（`resolve_palette_from` 在 `cli::process` 顶部，single+batch 都继承）；WASM `extract_palette` export；`tests/palette.rs`
+- **关键决策**：复用现有 Oklab k-means（dither/preset 关）抽 palette，sort 保 hex 稳定；显式 `--palette` > `--palette-from` 优先级（`palette.is_some()` 跳过提取）；Option C 统一 apply_palette 距离到 Oklab；batch 经 `cli::process` 单一入口 + `BatchConfig::from` 继承 palette（不动 batch.rs 逻辑）
+- **验证**：cargo test 68 passed（7 suites：57 baseline + 4 palette 单元 + 1 Oklab + 2 cli + 3 集成 + 1 palette_to_hex），wasm 0 warning，默认锚 Oklab `3a589ee9…e4420` 保持（无 `--palette` 时 apply_palette 不跑，零回归）
 
 ---
 

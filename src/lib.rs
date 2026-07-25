@@ -412,3 +412,28 @@ pub fn detect_candidates(
         .collect();
     Ok(format!("[{}]", json.join(",")))
 }
+
+/// WASM: extract a palette from a reference image as comma-separated hex,
+/// e.g. `"0d2b45,ff6b6b,..."`. Pass the result as the `palette_hex` arg of
+/// `process_image` to lock a frame to the reference's palette (cross-frame
+/// consistency for AI animation).
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn extract_palette(
+    input_bytes: &[u8],
+    k_colors: Option<u32>,
+) -> std::result::Result<String, wasm_bindgen::JsValue> {
+    let k = k_colors.unwrap_or(16) as usize;
+    if k == 0 {
+        return Err(wasm_bindgen::JsValue::from_str(
+            "k_colors must be greater than 0",
+        ));
+    }
+    let palette = palette::extract_palette_from_image_via_bytes(
+        input_bytes,
+        k,
+        quantize::Colorspace::Oklab,
+    )
+    .map_err(wasm_bindgen::JsValue::from)?;
+    Ok(palette::palette_to_hex(&palette))
+}

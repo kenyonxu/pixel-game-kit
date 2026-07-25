@@ -23,6 +23,9 @@ pub struct Config {
     /// Output image path only used for CLI use
     #[allow(dead_code)]
     pub(crate) output_path: String,
+    /// Path to a reference image for `--palette-from` (CLI only; never read under WASM).
+    #[allow(dead_code)]
+    pub(crate) palette_from_path: Option<String>,
     pub(crate) max_kmeans_iterations: usize,
     pub(crate) peak_threshold_multiplier: f64,
     pub(crate) peak_distance_filter: usize,
@@ -65,6 +68,7 @@ impl Default for Config {
             seed: 42,
             input_path: "samples/2/skeleton.png".to_string(),
             output_path: "samples/2/skeleton_fixed_clean2.png".to_string(),
+            palette_from_path: None,
             max_kmeans_iterations: 15,
             peak_threshold_multiplier: 0.2,
             peak_distance_filter: 4,

@@ -120,3 +120,18 @@ fn parses_preset_flag() {
         crate::quantize::PresetPalette::Pico8
     );
 }
+
+#[test]
+fn parses_palette_from_flag() {
+    let cmd = parse_cli_args(&args(&["i.png", "o.png", "--palette-from", "ref.png"])).unwrap();
+    let CliCommand::Run(c) = cmd else {
+        panic!("expected Run")
+    };
+    assert_eq!(c.palette_from_path.as_deref(), Some("ref.png"));
+}
+
+#[test]
+fn palette_from_requires_value() {
+    let result = parse_cli_args(&args(&["i.png", "o.png", "--palette-from"]));
+    assert!(matches!(result, Err(_)));
+}
