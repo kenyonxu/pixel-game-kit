@@ -57,6 +57,7 @@ pixel-game-kit <INPUT> <OUTPUT> [COLOR_COUNT] [OPTIONS]
 |---|---|---|---|
 | `--pixel-size` | positive number | auto | Override the detected pixel size |
 | `--palette` | `HEX,HEX,...` | — | Constrain to a custom palette |
+| `--palette-from` | path to PNG | — | Derive a palette from a reference image and snap to it (cross-frame consistency) |
 | `--detect` | `auto\|runs\|tiled\|elastic` | `auto` | Grid detection strategy |
 | `--resample` | `majority\|median\|dominant\|mode\|qvote` | `majority` | Grid-cell reduction |
 | `--sample-window` | `1`–`9` | `3` | Median neighborhood |
@@ -92,6 +93,9 @@ pixel-game-kit input.png output.png 16 --dither fs --preset nes
 
 # Custom palette
 pixel-game-kit input.png output.png --palette "0d2b45,203c56,544e68,8d697a,d08159,ffaa5e,ffd4a3,ffecd6"
+
+# Lock animation frames to a reference frame's palette (kills AI cross-frame color drift)
+pixel-game-kit frame2.png out.png 16 --palette-from reference_frame.png
 
 # Postprocess: remove background + sharp black outline + clean speckles
 pixel-game-kit input.png output.png 16 --bg-remove --outline sharp --morph
@@ -142,6 +146,14 @@ process_image(inputBytes, 16, null, null, null, null, null, null, null,
 ```
 
 `detect_candidates(inputBytes, kColors?, detectStrategy?)` returns a JSON string of ranked grid-detection candidates (for building a candidate-picker UI).
+
+`extract_palette(refBytes, kColors?)` returns a reference image's palette as `"hex,hex,..."` — pass it as `palette_hex` to `process_image` to lock a frame to the reference (cross-frame consistency for AI animation):
+
+```js
+import init, { process_image, extract_palette } from "./pkg/pixel_game_kit.js";
+// const refPalette = extract_palette(referenceBytes, 16);
+// process_image(frameBytes, 16, null, refPalette);
+```
 
 ## Acknowledgments
 
