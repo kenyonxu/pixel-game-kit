@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 47% 11%;        /* #0F172A slate-950 */
+    --foreground: 210 40% 98%;        /* #F8FAFC */
+    --card: 217 33% 17%;              /* #1E293B slate-800 */
+    --card-foreground: 210 40% 98%;
+    --popover: 217 33% 17%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 142 71% 45%;           /* #22C55E green-500 */
+    --primary-foreground: 222 47% 11%;
+    --secondary: 215 25% 27%;         /* #334155 slate-700 */
+    --secondary-foreground: 210 40% 98%;
+    --muted: 222 24% 20%;             /* #272F42 */
+    --muted-foreground: 215 20% 65%;
+    --accent: 142 71% 45%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;         /* #EF4444 */
+    --destructive-foreground: 210 40% 98%;
+    --border: 215 25% 27%;            /* #334155 hairline */
+    --input: 222 47% 11%;             /* dark inputs */
+    --ring: 142 71% 45%;              /* green ring */
+    --radius: 0.5rem;
+  }
+}
+
+html, body, #root { height: 100%; }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+img.pixelated, canvas.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
