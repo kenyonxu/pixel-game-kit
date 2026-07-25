@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { PipelineConfig, DEFAULT_CONFIG } from "./wasm/adapter";
+import type { PipelineConfig } from "./wasm/adapter";
+import { DEFAULT_CONFIG } from "./wasm/adapter";
 
 export type Status = "loading_wasm" | "ready" | "processing" | "error";
 
