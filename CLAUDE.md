@@ -16,6 +16,11 @@ cargo run --release -- <input> <output> [COLORS] [opts]  # Run without installin
 cargo install --path .                                 # Installs the `pixel-game-kit` binary
 
 wasm-pack build --target web --out-dir pkg --release   # WASM build → pkg/pixel_game_kit.js
+
+# Web app (Phase 6 MVP, React + Vite + shadcn + RJSF at web/) — consumes the WASM:
+cd web && npm install && npm run dev                     # dev server (prereq: wasm-pack build above)
+cd web && npm run build                                   # production build → web/dist
+cd web && npx vitest run                                  # adapter + store unit tests
 ```
 
 Binary name (and crate name) is `pixel-game-kit`; the WASM JS export is `process_image`. No linter/formatter config exists in-repo — `cargo fmt` / `cargo clippy` work but aren't wired to CI.
