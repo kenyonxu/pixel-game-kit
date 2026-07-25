@@ -45,13 +45,15 @@ pub fn parse_palette_hex(value: &str) -> Result<Vec<[u8; 3]>> {
 }
 
 pub fn nearest_palette_color(rgb: [u8; 3], palette: &[[u8; 3]]) -> [u8; 3] {
+    let target = crate::quantize::oklab::rgb_to_oklab(rgb[0], rgb[1], rgb[2]);
     let mut best_color = palette[0];
-    let mut best_distance = u32::MAX;
+    let mut best_distance = f32::MAX;
     for color in palette {
-        let dr = rgb[0] as i32 - color[0] as i32;
-        let dg = rgb[1] as i32 - color[1] as i32;
-        let db = rgb[2] as i32 - color[2] as i32;
-        let distance = (dr * dr + dg * dg + db * db) as u32;
+        let c = crate::quantize::oklab::rgb_to_oklab(color[0], color[1], color[2]);
+        let dl = target[0] - c[0];
+        let da = target[1] - c[1];
+        let db = target[2] - c[2];
+        let distance = dl * dl + da * da + db * db;
         if distance < best_distance {
             best_distance = distance;
             best_color = *color;
@@ -171,5 +173,27 @@ mod palette_tests {
             &pal[0],
             "frame2 snapped to frame1's palette entry -> cross-frame consistency"
         );
+    }
+
+    #[test]
+    fn nearest_uses_oklab_distance() {
+        // Regression guard: nearest_palette_color must match an independent
+        // Oklab-nearest computation. Breaks if someone reverts to RGB distance
+        // for a target where Oklab and RGB disagree.
+        let target = [180, 60, 60];
+        let palette = [[255, 0, 0], [180, 180, 60], [60, 60, 60]];
+        let got = nearest_palette_color(target, &palette);
+        let t = crate::quantize::oklab::rgb_to_oklab(target[0], target[1], target[2]);
+        let mut expected = palette[0];
+        let mut best = f32::MAX;
+        for c in &palette {
+            let o = crate::quantize::oklab::rgb_to_oklab(c[0], c[1], c[2]);
+            let d = (t[0] - o[0]).powi(2) + (t[1] - o[1]).powi(2) + (t[2] - o[2]).powi(2);
+            if d < best {
+                best = d;
+                expected = *c;
+            }
+        }
+        assert_eq!(got, expected);
     }
 }
