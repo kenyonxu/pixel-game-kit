@@ -340,6 +340,36 @@ done | tee -a .phase0-baseline.log
 
 ---
 
+## Phase 5.5 — 参考调色板锁定（palette lock）
+
+**目标**：解决 AI 动画帧间轻微色差——从参考帧导出调色板，锁定到其余帧。确定性（seed=42）只保证单图可复现，**不**保证跨帧一致（k-means 中心每帧不同）；本 phase 补这个 gap。
+
+**来源**：无外部源（复用现有 Oklab k-means + apply_palette）。Spec：[2026-07-25-phase5.5-palette-lock-design.md](docs/superpowers/specs/2026-07-25-phase5.5-palette-lock-design.md)
+
+### 任务
+
+- [ ] `palette.rs::extract_palette(bytes, k_colors, colorspace) -> Result<Vec<[u8;3]>>`：对参考图跑 Oklab k-means（`dither=None`/`preset=None`，干净 k 色）→ 收集量化输出的 unique RGB（跳过透明像素）→ **排序后**返回（保 hex 稳定）
+- [ ] Config 加 `palette_from_path: Option<String>`（CLI-only，仿 `input_path`，wasm 下 `#[allow(dead_code)]`）
+- [ ] CLI `--palette-from <ref.png>`：设 `palette_from_path`；run 路径加载 ref 一次 → `extract_palette` → 设 `config.palette`。batch 下提取一次应用到全部帧（跨帧一致）
+- [ ] 优先级 `--palette`（显式 hex）> `--palette-from`（导出）> `--preset`；两者同传时 `--palette` 胜，跳过提取
+- [ ] WASM `extract_palette(bytes, k_colors) -> String`（hex），caller 调它拿参考 palette 再当 `palette_hex` 传回 `process_image`（不加 bytes 参数到 process_image）
+- [ ] **Option C**：`nearest_palette_color` 改 Oklab 平方欧氏（复用 `quantize::oklab::rgb_to_oklab`），cache 仍按 unique input RGB（转换每 unique 色一次，不每像素）
+- [ ] 回归测试：`extract_palette` 确定性（同 ref→同 hex，排序保稳定）；跨帧一致（合成 f1 红 220,40,40 + f2 红 215,45,38，从 f1 导 palette 贴两帧→同 palette 项）；Oklab snap 等距测试；默认锚 `3a589ee9…e4420` 不变（无 `--palette` 时 apply_palette 不跑）；受影响 `--palette` 测试锚重锁
+
+### 验收
+- 同一参考图两次 `extract_palette` → byte 一致 hex（R1）
+- 帧间轻微色差经 `--palette-from` 后消除（同色贴到同一 palette 项）
+- `apply_palette` Oklab 距离与 `quantize` 一致；cache 保其廉价
+- 默认锚 Oklab `3a589ee9…e4420` + RGB `802857…9f22` 不变；`cargo test` 全绿；wasm 0 warning
+
+### 风险
+- Option C 改 `--palette` 输出 → 重锁受影响测试锚（默认路径不动）
+- `extract_palette` unique 收集顺序不定（HashSet）→ 排序后再返回（hex 稳定）
+- batch 参考文件缺失/不可读 → 明确错误，不静默回退到逐帧 k-means
+- ref palette 尺寸 < `k_colors`（空聚类）→ 返回实际 uniques，`apply_palette` 处理任意非空 palette
+
+---
+
 ## Phase 6 — 产品功能层（Web + 跨形态共享）
 
 **目标**：在算法 Phase 之上构建完整产品，覆盖 USER_STORIES 标「产品」的 story（U9 预设 / U10 会话 / U4.6 调色板编辑器 / U8 导出 / U11.2 recipe）。
