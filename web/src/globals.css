@@ -5,6 +5,7 @@
 
 @layer base {
   :root {
+    color-scheme: dark;               /* native <select>/<option>/scrollbars render dark */
     --background: 222 47% 11%;        /* #0F172A slate-950 */
     --foreground: 210 40% 98%;        /* #F8FAFC */
     --card: 217 33% 17%;              /* #1E293B slate-800 */
