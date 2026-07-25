@@ -43,7 +43,7 @@ export const uiSchema: UiSchema = {
   },
   postprocess: {
     bg_remove: {
-      "ui:widget": "checkboxes",
+      "ui:widget": "checkbox",
     },
     bg_tolerance: {
       "ui:widget": "range",
@@ -67,7 +67,7 @@ export const uiSchema: UiSchema = {
       "ui:placeholder": "000000",
     },
     morph: {
-      "ui:widget": "checkboxes",
+      "ui:widget": "checkbox",
     },
     alpha_threshold: {
       "ui:placeholder": '"" = off, "auto" = Otsu, or 0–255',
